@@ -1,0 +1,73 @@
+<?php
+require_once '../../includes/config.php';
+require_once '../../includes/functions.php';
+
+if (!isLoggedIn() || !isAdmin()) {
+    redirect('../../index.php');
+}
+
+// Handle user actions
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['delete_user'])) {
+        $userId = sanitize($_POST['user_id']);
+        
+        // Prevent self-deletion
+        if ($userId != $_SESSION['user_id']) {
+            $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+            $stmt->execute([$userId]);
+            
+            logActivity($_SESSION['user_id'], 'delete_user', "Deleted user ID: $userId");
+            $_SESSION['success'] = "User deleted successfully";
+        } else {
+            $_SESSION['error'] = "You cannot delete yourself";
+        }
+    }
+}
+
+// Get all users
+$stmt = $pdo->prepare("SELECT * FROM users ORDER BY created_at DESC");
+$stmt->execute();
+$users = $stmt->fetchAll();
+?>
+
+<?php include '../../includes/header.php'; ?>
+
+<div class="container">
+    <h1>User Management</h1>
+    
+    <?php if (isset($_SESSION['success'])): ?>
+        <div class="alert alert-success"><?= $_SESSION['success']; unset($_SESSION['success']); ?></div>
+    <?php endif; ?>
+    
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($users as $user): ?>
+            <tr>
+                <td><?= $user['id']; ?></td>
+                <td><?= $user['name']; ?></td>
+                <td><?= $user['email']; ?></td>
+                <td><?= ucfirst($user['role']); ?></td>
+                <td>
+                    <a href="edit-user.php?id=<?= $user['id']; ?>" class="btn btn-primary">Edit</a>
+                    <form method="POST" style="display:inline;">
+                        <input type="hidden" name="user_id" value="<?= $user['id']; ?>">
+                        <button type="submit" name="delete_user" class="btn btn-danger" 
+                                onclick="return confirm('Are you sure?')">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+</div>
+
+<?php include '../../includes/footer.php'; ?>
